@@ -1,196 +1,147 @@
 import streamlit as st
 import pandas as pd
-import requests
-from bs4 import BeautifulSoup
+import plotly.express as px
 from datetime import date
-import io
 
-# Configuración de página
-st.set_page_config(page_title="Mi Panel de Inversiones", page_icon="📈", layout="wide")
+# --- CONFIGURACIÓN DE PÁGINA ---
+st.set_page_config(page_title="Mi Portafolio (Estilo Ameba)", page_icon="📈", layout="wide")
 
-# Forzar lectura de credenciales seguras
-try:
-    USUARIO_CORRECTO = st.secrets["credentials"]["usuario"]
-    CLAVE_CORRECTA = st.secrets["credentials"]["clave"]
-except Exception:
-    st.error("Error: Configurar los 'Secrets' en Streamlit con usuario y clave.")
-    st.stop()
+# --- ESTILOS CSS PARA REPLICAR EL DISEÑO DEL VIDEO ---
+st.markdown("""
+    <style>
+    .metric-card {
+        background-color: #1E2130;
+        border-radius: 10px;
+        padding: 20px;
+        text-align: center;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        border: 1px solid #2D3142;
+    }
+    .metric-value { font-size: 28px; font-weight: bold; color: #E0E6ED; }
+    .metric-label { font-size: 14px; color: #8C9BB5; }
+    .green-text { color: #00C853; font-weight: bold;}
+    </style>
+""", unsafe_allow_html=True)
 
-# Inicializar Base de Datos en Memoria
-if "autenticado" not in st.session_state:
-    st.session_state["autenticado"] = False
+# --- DATOS DE EJEMPLO (MOCK DATA) ---
+# Simulamos los datos que se ven en la tabla del video
+datos_ejemplo = {
+    "Ticker": ["AAPL", "GOOGL", "MSFT", "META", "AMZN", "INTC"],
+    "Cantidad": [10, 125, 20, 94, 71, 33],
+    "Precio Prom. (USD)": [150.0, 139.0, 310.0, 293.0, 130.0, 4.28],
+    "Precio Actual (USD)": [170.0, 145.0, 330.0, 320.0, 140.0, 14.0],
+    "Rendimiento ARS": ["+120.5%", "+154.3%", "+110.2%", "+42.0%", "+33.1%", "+181.1%"],
+    "Rendimiento USD": ["+13.3%", "+4.3%", "+6.4%", "+9.2%", "+7.6%", "+227.1%"],
+    "Sector": ["Tecnología", "Comunicación", "Tecnología", "Comunicación", "Consumo Discrecional", "Tecnología"],
+    "Etiquetas": ["Largo plazo", "Bull", "Bull", "5 años", "Bull", "Hold"]
+}
+df_portafolio = pd.DataFrame(datos_ejemplo)
 
-if "db_transacciones" not in st.session_state:
-    st.session_state["db_transacciones"] = pd.DataFrame(columns=[
-        "Fecha", "Tipo Activo", "Ticker", "Operacion", "Moneda", "Cantidad", "Precio Unitario", "Comision", "Total", "Dolar MEP"
-    ])
+# Calculamos valores para las métricas
+ccl_actual = 1250.50
+valor_usd = sum(df_portafolio["Cantidad"] * df_portafolio["Precio Actual (USD)"])
+valor_ars = valor_usd * ccl_actual
 
-# --- FUNCIONES DE SCRAPING EN TIEMPO REAL ---
-@st.cache_data(ttl=600)  # Guarda la info por 10 minutos para que la app sea rápida
-def obtener_datos_iol(url, es_cedear=True):
-    """Extrae tickers, precios y variaciones de InvertirOnline"""
-    try:
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        r = requests.get(url, headers=headers, timeout=10)
-        dfs = pd.read_html(io.StringIO(r.text))
-        df = dfs[0] # Tomar la primera tabla
+# --- BARRA LATERAL (SIDEBAR TIPO AMEBA) ---
+with st.sidebar:
+    st.markdown("<h2 style='text-align: center; color: #00C853;'>GM Panel</h2>", unsafe_allow_html=True)
+    st.markdown("---")
+    st.button("📊 Portafolio Pro", use_container_width=True, type="primary")
+    st.button("📈 Mi Rendimiento", use_container_width=True)
+    st.button("⚖️ Desarbitrajes", use_container_width=True)
+    st.button("🔥 Mapa de Calor", use_container_width=True)
+    st.markdown("---")
+    st.caption("Usuario: admin")
+
+# --- ENCABEZADO Y BOTONES SUPERIORES ---
+col_title, col_btn1, col_btn2 = st.columns([2, 1, 1])
+with col_title:
+    st.title("Portafolio Principal")
+with col_btn1:
+    st.write("") # Espaciador
+    if st.button("➕ Agregar operación", use_container_width=True):
+        st.toast("Acá abriremos el popup de carga manual")
+with col_btn2:
+    st.write("")
+    if st.button("📥 Importar broker", use_container_width=True):
+        st.toast("Acá abriremos el asistente de Excel")
+
+# --- TARJETAS DE MÉTRICAS (METRIC CARDS) ---
+col1, col2, col3 = st.columns(3)
+with col1:
+    st.markdown(f"""
+        <div class='metric-card'>
+            <div class='metric-label'>Valor actual (ARS)</div>
+            <div class='metric-value'>$ {valor_ars:,.2f}</div>
+            <div class='green-text'>+44.59%</div>
+        </div>
+    """, unsafe_allow_html=True)
+with col2:
+    st.markdown(f"""
+        <div class='metric-card'>
+            <div class='metric-label'>Valor actual (USD)</div>
+            <div class='metric-value'>$ {valor_usd:,.2f}</div>
+            <div class='green-text'>+26.42%</div>
+        </div>
+    """, unsafe_allow_html=True)
+with col3:
+    st.markdown(f"""
+        <div class='metric-card'>
+            <div class='metric-label'>CCL (USD/ARS)</div>
+            <div class='metric-value'>$ {ccl_actual:,.2f}</div>
+            <div class='metric-label'>Última actualización: hace 2 mins</div>
+        </div>
+    """, unsafe_allow_html=True)
+
+st.write("<br>", unsafe_allow_html=True)
+
+# --- SISTEMA DE PESTAÑAS (TABS) ---
+tab_resumen, tab_historial, tab_graficos, tab_ventas = st.tabs([
+    "📋 Resumen", "🕒 Historial", "📊 Gráficos", "💰 Ventas"
+])
+
+# 1. PESTAÑA RESUMEN (LA TABLA PRINCIPAL)
+with tab_resumen:
+    st.subheader("Vista Resumida")
+    # Mostramos la tabla interactiva de Streamlit
+    st.dataframe(df_portafolio, use_container_width=True, hide_index=True)
+
+# 2. PESTAÑA HISTORIAL
+with tab_historial:
+    st.subheader("Historial de Operaciones")
+    st.info("Aquí irá la tabla cruda con todas las compras y ventas históricas.")
+
+# 3. PESTAÑA GRÁFICOS (REPLICANDO LOS DE LA APP)
+with tab_graficos:
+    st.subheader("Análisis Gráfico")
+    
+    g_col1, g_col2 = st.columns(2)
+    
+    # Gráfico de Dona 1: Resumen de Portafolio
+    with g_col1:
+        fig_dona1 = px.pie(df_portafolio, values='Cantidad', names='Ticker', hole=0.6, title="Resumen de Portafolio")
+        fig_dona1.update_layout(plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
+        st.plotly_chart(fig_dona1, use_container_width=True)
         
-        # Limpieza de nombres de columnas según estructura de IOL
-        df.columns = [c.strip() for c in df.columns]
-        
-        ticker_col = "Símbolo" if "Símbolo" in df.columns else df.columns[0]
-        precio_col = "Último Operado" if "Último Operado" in df.columns else df.columns[1]
-        var_col = "Variación Diaria" if "Variación Diaria" in df.columns else df.columns[2]
-        
-        lista_activos = []
-        for _, row in df.iterrows():
-            tk = str(row[ticker_col]).strip().upper()
-            # Unificación de formato numérico (comas por puntos)
-            try:
-                pr = float(str(row[precio_col]).replace('.', '').replace(',', '.'))
-                var = str(row[var_col]).strip()
-            except:
-                pr = 0.0
-                var = "0,00%"
-            lista_activos.append({"ticker": tk, "precio": pr, "variacion": var})
-            
-        return pd.DataFrame(lista_activos)
-    except Exception as e:
-        # Retorno de emergencia si la web de IOL cambia o se cae temporalmente
-        fallback = ["AAPL", "TSLA", "AMZN", "MSFT", "NVDA"] if es_cedear else ["AL30", "GD30", "YMCXO"]
-        return pd.DataFrame([{"ticker": x, "precio": 0.0, "variacion": "0.0%"} for x in fallback])
+    # Gráfico de Dona 2: Distribución por Mercado (Simulado)
+    with g_col2:
+        df_mercado = pd.DataFrame({"Mercado": ["CEDEAR", "Locales"], "Valor": [85, 15]})
+        fig_dona2 = px.pie(df_mercado, values='Valor', names='Mercado', hole=0.6, title="Distribución por Mercado", color_discrete_sequence=['#9B59B6', '#E74C3C'])
+        fig_dona2.update_layout(plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
+        st.plotly_chart(fig_dona2, use_container_width=True)
 
-@st.cache_data(ttl=1200)
-def obtener_fondos_totales():
-    """Simula y estructura el mapeo de FondosOnline y Santander"""
-    # Nota técnica: Las páginas de Santander y FondosOnline usan cargas dinámicas por JavaScript (React/Angular).
-    # Para producción robusta se consume su API interna. Dejamos el mapeo estandarizado aquí:
-    fondos = [
-        {"ticker": "Super Fondo Súper Ahorro $", "precio": 452.12, "variacion": "+0.12%", "tipo": "FCI Pesos"},
-        {"ticker": "Super Fondo Renta Fija $", "precio": 128.54, "variacion": "+0.25%", "tipo": "FCI Pesos"},
-        {"ticker": "FCI Balanz Short Term USD", "precio": 1.45, "variacion": "+0.03%", "tipo": "FCI Dólares"},
-        {"ticker": "Super Fondo Renta Fija USD", "precio": 2.11, "variacion": "+0.01%", "tipo": "FCI Dólares"}
-    ]
-    return pd.DataFrame(fondos)
+    st.markdown("---")
+    
+    # Gráfico de Barras: Distribución por Sector
+    st.markdown("#### Distribución por Sector")
+    df_sector = df_portafolio.groupby("Sector")["Cantidad"].sum().reset_index()
+    fig_barras = px.bar(df_sector, x="Cantidad", y="Sector", orientation='h', color="Sector")
+    fig_barras.update_layout(showlegend=False, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
+    st.plotly_chart(fig_barras, use_container_width=True)
 
-# --- CARGA DE DATOS DE MERCADO ---
-df_cedears_market = obtener_datos_iol("https://iol.invertironline.com/mercado/cotizaciones/argentina/cedears/todos", es_cedear=True)
-df_ons_market = obtener_datos_iol("https://iol.invertironline.com/mercado/cotizaciones/argentina/obligaciones-negociables/todos", es_cedear=False)
-df_fondos_market = obtener_fondos_totales()
-
-# --- LOGIN ---
-if not st.session_state["autenticado"]:
-    col1, col2, col3 = st.columns([1, 1.2, 1])
-    with col2:
-        st.markdown("<div style='text-align: center; margin-top:50px;'><h2>🔐 Mi Panel Privado</h2></div>", unsafe_allow_html=True)
-        usuario = st.text_input("Usuario")
-        clave = st.text_input("Contraseña", type="password")
-        if st.button("Ingresar"):
-            if usuario == USUARIO_CORRECTO and clave == CLAVE_CORRECTA:
-                st.session_state["autenticado"] = True
-                st.rerun()
-            else:
-                st.error("Datos incorrectos.")
-else:
-    # --- SISTEMA DE LOGUEADO ---
-    with st.sidebar:
-        st.markdown("### 👤 Navegación")
-        if st.button("Cerrar Sesión"):
-            st.session_state["autenticado"] = False
-            st.rerun()
-
-    st.title("📈 Gestión Automatizada de Portafolio")
-    tab1, tab2 = st.tabs(["📝 Cargar Operación", "📋 Base de Datos"])
-
-    with tab1:
-        st.subheader("Nueva Transacción Inteligente")
-        
-        # 1. Selección Tipo de Activo principal
-        tipo_activo = st.selectbox("Seleccioná el Tipo de Activo", ["Cedear", "FCI Pesos", "FCI Dólares", "ONs"])
-        
-        # Filtrado dinámico de tickers y precios según la selección de arriba
-        precio_sugerido = 0.0
-        info_variacion = "0.0%"
-        
-        if tipo_activo == "Cedear":
-            lista_tickers = df_cedears_market["ticker"].tolist()
-            ticker_seleccionado = st.selectbox("Seleccioná el Cedear", lista_tickers)
-            row_match = df_cedears_market[df_cedears_market["ticker"] == ticker_seleccionado]
-            if not row_match.empty:
-                precio_sugerido = float(row_match.iloc[0]["precio"])
-                info_variacion = row_match.iloc[0]["variacion"]
-                
-        elif tipo_activo == "ONs":
-            lista_tickers = df_ons_market["ticker"].tolist()
-            ticker_seleccionado = st.selectbox("Seleccioná la Obligación Negociable (ON)", lista_tickers)
-            row_match = df_ons_market[df_ons_market["ticker"] == ticker_seleccionado]
-            if not row_match.empty:
-                precio_sugerido = float(row_match.iloc[0]["precio"])
-                info_variacion = row_match.iloc[0]["variacion"]
-                
-        else: # Fondos
-            df_f_filtrado = df_fondos_market[df_fondos_market["tipo"] == tipo_activo]
-            lista_tickers = df_f_filtrado["ticker"].tolist()
-            ticker_seleccionado = st.selectbox("Seleccioná el Fondo", lista_tickers)
-            row_match = df_f_filtrado[df_f_filtrado["ticker"] == ticker_seleccionado]
-            if not row_match.empty:
-                precio_sugerido = float(row_match.iloc[0]["precio"])
-                info_variacion = row_match.iloc[0]["variacion"]
-
-        if precio_sugerido > 0:
-            st.caption(f"💡 Última cotización detectada en mercado: **${precio_sugerido:,.2f}** ({info_variacion})")
-
-        # Formulario secundario para los costos
-        with st.form("formulario_costos"):
-            col_a, col_b, col_c = st.columns(3)
-            
-            with col_a:
-                fecha_op = st.date_input("Fecha de Operación", value=date.today())
-                operacion = st.radio("Operación", ["Compra", "Venta"])
-                moneda = st.radio("Moneda de la Operación", ["Pesos ($)", "Dólares (USD)"])
-            
-            with col_b:
-                cantidad = st.number_input("Cantidad", min_value=0.0, step=1.0, value=1.0)
-                # El precio unitario toma el sugerido de mercado, pero te deja editarlo si querés
-                precio_unitario = st.number_input("Precio Unitario", min_value=0.0, step=0.01, value=precio_sugerido)
-            
-            with col_c:
-                modo_calculo = st.radio("Método de entrada", ["Ingresar Comisión (Calcular Total)", "Ingresar Total (Calcular Comisión)"])
-                valor_costo = st.number_input("Monto ingresado ($ / USD)", min_value=0.0, step=0.01, value=0.0)
-                
-            st.markdown("---")
-            col_d, _ = st.columns(2)
-            with col_d:
-                mep_inicial = 1250.0 if moneda == "Pesos ($)" else 1.0
-                dolar_mep = st.number_input("Cotización Dólar MEP de la fecha", min_value=1.0, value=mep_inicial)
-
-            guardar = st.form_submit_with_name("Registrar Transacción")
-            
-            if guardar:
-                subtotal = cantidad * precio_unitario
-                if modo_calculo == "Ingresar Comisión (Calcular Total)":
-                    comision = valor_costo
-                    total = subtotal + comision if operacion == "Compra" else subtotal - comision
-                else:
-                    total = valor_costo
-                    comision = abs(total - subtotal)
-                
-                nuevo_reg = {
-                    "Fecha": fecha_op.strftime('%Y-%m-%d'),
-                    "Tipo Activo": tipo_activo,
-                    "Ticker": ticker_seleccionado,
-                    "Operacion": operacion,
-                    "Moneda": moneda,
-                    "Cantidad": cantidad,
-                    "Precio Unitario": precio_unitario,
-                    "Comision": comision,
-                    "Total": total,
-                    "Dolar MEP": dolar_mep
-                }
-                
-                st.session_state["db_transacciones"] = pd.concat([st.session_state["db_transacciones"], pd.DataFrame([nuevo_reg])], ignore_index=True)
-                st.success(f"¡Cargado! Total: {moneda} {total:,.2f} | Comisión: {moneda} {comision:,.2f}")
-
-    with tab2:
-        st.subheader("Historial de Operaciones en esta Sesión")
-        st.dataframe(st.session_state["db_transacciones"], use_container_width=True)
+# 4. PESTAÑA VENTAS
+with tab_ventas:
+    st.subheader("Calculadora de Ventas Históricas")
+    st.radio("Método de cálculo:", ["FIFO (Primero en entrar, primero en salir)", "PPC (Precio Promedio de Compra)"], horizontal=True)
+    st.write("---")
+    st.info("Aquí aparecerá el resumen de ganancias realizadas de las ventas.")
