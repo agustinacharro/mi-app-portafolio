@@ -17,8 +17,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Credenciales de Acceso
-USUARIO_CORRECTO = "admin"
-CLAVE_CORRECTA = "inversiones2026"
+USUARIO_CORRECTO = st.secrets["credentials"]["usuario"]
+CLAVE_CORRECTA = st.secrets["credentials"]["clave"]
 
 # Inicialización de la base de datos interna en memoria
 if "autenticado" not in st.session_state:
